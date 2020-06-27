@@ -47,56 +47,37 @@ ui <- fluidPage(
 server <- function(input, output) {
 
     numBoots <- 1000
+    
     FL1 <- c("RealShit","AAMC1_CP","AAMC1_CARS","AAMC1_BB","AAMC1_PS")
     FL2 <- c("RealShit","AAMC2_CP","AAMC2_CARS","AAMC2_BB","AAMC2_PS")
     FL3 <- c("RealShit","AAMC3_CP","AAMC3_CARS","AAMC3_BB","AAMC3_PS")
+    
     preds <- matrix(nrow = numBoots,ncol = 1)
+    
+    bootstrapFL <- function(test) {
+        data <- na.omit(select(Scores2019, all_of(test)))
+        colnames(data) <- c("RealShit","CPscore","CARSscore","BBscore","PSscore")
+        N <- nrow(data)
+        for(i in 1:numBoots){
+            samp <- sample(N,numBoots,rep=T)
+            boots <- data[samp,]
+            lm <- lm(RealShit ~ ., data = boots)
+            preds[i,] <- predict(lm, newdata = data.frame(
+                CPscore = input$CPscore,
+                CARSscore = input$CARSscore,
+                BBscore = input$BBscore,
+                PSscore = input$PSscore))
+        }
+        return(preds)
+    }
+    
     scoreModel <- reactive({
         if(input$test == 1) {
-            data <- na.omit(select(Scores2019, all_of(FL1)))
-            colnames(data) <- c("RealShit","CPscore","CARSscore","BBscore","PSscore")
-            N <- nrow(data)
-            for(i in 1:numBoots){
-                samp <- sample(N,numBoots,rep=T)
-                boots <- data[samp,]
-                lm <- lm(RealShit ~ ., data = boots)
-                preds[i,] <- predict(lm, newdata = data.frame(
-                    CPscore = input$CPscore,
-                    CARSscore = input$CARSscore,
-                    BBscore = input$BBscore,
-                    PSscore = input$PSscore))
-            }
-            return(preds)
+            bootstrapFL(FL1)
         } else if(input$test == 2) {
-            data <- na.omit(select(Scores2019, all_of(FL2)))
-            colnames(data) <- c("RealShit","CPscore","CARSscore","BBscore","PSscore")
-            N <- nrow(data)
-            for(i in 1:numBoots){
-                samp <- sample(N,numBoots,rep=T)
-                boots <- data[samp,]
-                lm <- lm(RealShit ~ ., data = boots)
-                preds[i,] <- predict(lm, newdata = data.frame(
-                    CPscore = input$CPscore,
-                    CARSscore = input$CARSscore,
-                    BBscore = input$BBscore,
-                    PSscore = input$PSscore))
-            }
-            return(preds)
+            bootstrapFL(FL2)
         } else if(input$test == 3) {
-            data <- na.omit(select(Scores2019, all_of(FL3)))
-            colnames(data) <- c("RealShit","CPscore","CARSscore","BBscore","PSscore")
-            N <- nrow(data)
-            for(i in 1:numBoots){
-                samp <- sample(N,numBoots,rep=T)
-                boots <- data[samp,]
-                lm <- lm(RealShit ~ ., data = boots)
-                preds[i,] <- predict(lm, newdata = data.frame(
-                    CPscore = input$CPscore,
-                    CARSscore = input$CARSscore,
-                    BBscore = input$BBscore,
-                    PSscore = input$PSscore))
-            }
-            return(preds)
+            bootstrapFL(FL3)
         }
     })
     score <- reactive({sort(scoreModel())})
@@ -107,7 +88,7 @@ server <- function(input, output) {
         round(score()[(numBoots - 0.05*numBoots)],1)
     })
     output$score <- renderText({
-        paste("Based on predictions from 1000 random samples of the data, my best guess is you will score in the ballpark of",guessLow(),"-",guessHigh())
+        paste("Based on predictions from 1000 random samples of the data, my best guess is that you will score in the ballpark of",guessLow(),"-",guessHigh())
     })
     output$bootPlot <- renderPlot({
         predictions  <- score()
